@@ -10,9 +10,21 @@ from demo_rpn_utils.run_SiamRPN import SiamRPN_init, SiamRPN_track
 from demo_rpn_utils.utils import get_axis_aligned_bbox, cxy_wh_2_rect, load_net
 
 
+# Try SiamRPN:
+# Download the pretrained model and put it in ./cp folder.
+# python demo_rpn.py --model SiamRPNResNeXt22
+
+# Try SiamRPN++:
+# Download the pretrained model and put it in ./cp folder.
+# python demo_rpn.py --model SiamRPNPPRes50
+
+
 parser = argparse.ArgumentParser(description='PyTorch SiameseX demo')
 
-parser.add_argument('--model', metavar='model', default='SiamRPNPPRes50', type=str,
+parser.add_argument('--model', metavar='model', 
+                    #default='SiamRPNPPRes50',
+                    default='SiamRPNResNeXt22',
+                    type=str,
                     help='which model to use.')
 args = parser.parse_args()
 
@@ -44,6 +56,8 @@ for f, image_file in enumerate(image_files):
     # print(res)
     cv2.rectangle(im, (res[0], res[1]), (res[0] + res[2], res[1] + res[3]), (0, 255, 255), 3)
     cv2.imshow('SiamRPN', im)
-    cv2.waitKey(1)
+    if cv2.waitKey(1)==27:
+        break;
 
+cv2.destroyAllWindows()
 print('Tracking Speed {:.1f}fps'.format((len(image_files)-1)/(toc/cv2.getTickFrequency())))

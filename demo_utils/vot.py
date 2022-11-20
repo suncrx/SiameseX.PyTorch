@@ -25,12 +25,18 @@ Point = collections.namedtuple('Point', ['x', 'y'])
 Polygon = collections.namedtuple('Polygon', ['points'])
 
 
+# suncrx added comments and modified the function on 2022.11.20.
+# string contains the region coordinates, e.g.:
+# '334.02,128.36,438.19,188.78,396.39,260.83,292.23,200.41'
 def parse_region(string):
     tokens = map(float, string.split(','))
+    #convert the map to list 
+    tokens = list(tokens)
     if len(tokens) == 4:
         return Rectangle(tokens[0], tokens[1], tokens[2], tokens[3])
     elif len(tokens) % 2 == 0 and len(tokens) > 4:
-        return Polygon([Point(tokens[i], tokens[i+1]) for i in xrange(0, len(tokens), 2)])
+        #return Polygon([Point(tokens[i], tokens[i+1]) for i in xrange(0, len(tokens), 2)])
+        return Polygon([Point(tokens[i], tokens[i+1]) for i in range(0, len(tokens), 2)])
     return None
 
 

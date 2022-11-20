@@ -9,6 +9,15 @@ import time
 import demo_utils.vot as vot
 from demo_utils.siamvggtracker import SiamVGGTracker
 
+# =====================================================
+#Try SiamFC:
+
+#Clone this repo and run
+#python demo.py --model SiamFC
+
+#You can change --mdoel to other models like
+# python demo.py --model SiamFCNext22
+# =====================================================
 
 # *****************************************
 # VOT: Create VOT handle at the beginning
@@ -18,7 +27,9 @@ from demo_utils.siamvggtracker import SiamVGGTracker
 
 parser = argparse.ArgumentParser(description='PyTorch SiameseX demo')
 
-parser.add_argument('--model', metavar='model', default='SiamFCNext22', type=str,
+parser.add_argument('--model', metavar='model', 
+                    default='SiamFC', #default='SiamFCNext22', 
+                    type=str,
                     help='which model to use.')
 
 args = parser.parse_args()
@@ -59,9 +70,10 @@ while True:
     handle.report(region, confidence)
     cv2.rectangle(image, (int(region.x), int(region.y)), (int(region.x + region.width), int(region.y + region.height)), (0, 255, 255), 3)
     cv2.imshow('SiameseX', image)
-    cv2.waitKey(1)
-    # if cv2.waitKey() == 27:
-    #     break
+    #cv2.waitKey(1)
+    if cv2.waitKey(5) == 27:
+        break
 
     print('Tracking Speed {:.1f}fps'.format((len(handle) - 1) / (toc / cv2.getTickFrequency())))
 
+cv2.destroyAllWindows()
