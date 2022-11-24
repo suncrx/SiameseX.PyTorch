@@ -37,6 +37,7 @@ def convert_bbox_format(bbox, to='center-based'):
     return Rectangle(x*1.0, y*1.0, target_width*1.0, target_height*1.0)
 
 
+# get an expanded bounding box from the give bbox, with the expanding ratio of p_rate
 def get_zbox(bbox, p_rate=0.25):
     x, y, target_width, target_height = bbox.x, bbox.y, bbox.width, bbox.height
     p = 2 * p_rate * (target_width+target_height)

@@ -9,7 +9,8 @@ import torchvision.transforms.functional as F
 
 
 class listDataset(Dataset):
-    def __init__(self, ilsvrc, youtube, data_type='RPN', shape=None, shuffle=True, transform=None,  train=False, seen=0, batch_size=1, num_workers=4, coco=0, rpnpp=False):
+    def __init__(self, ilsvrc, youtube, data_type='RPN', shape=None, shuffle=True, transform=None,  train=False,
+                 seen=0, batch_size=1, num_workers=4, coco=0, rpnpp=False):
         
         self.coco = coco
         self.data_type = data_type
@@ -27,15 +28,18 @@ class listDataset(Dataset):
 
         if self.train:
             if ilsvrc is not None:
-                ilsvrc_sample = [ilsvrc[i] for i in sorted(random.sample(xrange(len(ilsvrc)), 1000))]
+                #ilsvrc_sample = [ilsvrc[i] for i in sorted(random.sample(xrange(len(ilsvrc)), 1000))]
+                #ilsvrc_sample = [ilsvrc[i] for i in sorted(random.sample(range(len(ilsvrc)), 1000))]
+                ilsvrc_sample = [ilsvrc[i] for i in sorted(random.sample(range(len(ilsvrc)), int(len(ilsvrc)*0.5)))]
             if youtube is not None:
-                youtube_sample = [youtube[i] for i in sorted(random.sample(xrange(len(youtube)), 5000))]
+                youtube_sample = [youtube[i] for i in sorted(random.sample(range(len(youtube)), 5000))]
             all_sample = ilsvrc_sample + youtube_sample
             
         self.nSamples = len(all_sample)
         self.lines = []
 
-        for i in xrange(self.nSamples):
+        #for i in xrange(self.nSamples):
+        for i in range(self.nSamples):
             sequence = all_sample[i]
             ran_id = random.randint(0, len(sequence)-1)
                     
@@ -55,6 +59,8 @@ class listDataset(Dataset):
 
     def __len__(self):
         return self.nSamples
+
+
 
     def __getitem__(self, index):
         assert index <= len(self), 'index range error' 
@@ -87,3 +93,13 @@ class listDataset(Dataset):
 
             return z, x, regression_target, label
 
+
+if __name__ == '__main__':
+    import json
+    txtfile =  'D:\\GeoData\\Benchmark\\VIDEOS\\VOT2015\\vot2018.txt'
+    with open(txtfile, 'r') as outfile:
+        dd = json.load(outfile)
+        ds = listDataset(dd, None, data_type='NORPN', train=True)
+        d1 = ds[0]
+        #print(d1)
+    print('OK')

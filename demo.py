@@ -3,6 +3,7 @@
 import torch
 import argparse
 import sys
+import os
 import cv2
 import numpy as np
 import time
@@ -25,6 +26,21 @@ from demo_utils.siamvggtracker import SiamVGGTracker
 #      and the first image
 # *****************************************
 
+#--------------------------------------------------------
+# parameters
+# data_dir =
+#img_dir = './data/bag'
+#gt_file = './data/bag/groundtruth.txt'
+
+root_dir   = 'D:\\GeoData\\Videos\\Drone\\drone1'
+img_folder = 'frames2'
+gt_file    = 'groundtruth.txt'
+
+root_dir   = 'D:\\GeoData\\Benchmark\\VIDEOS\\VTB\\Car24'
+img_folder = 'img'
+gt_file    = 'groundtruth_rect.txt'
+#------------------------------------------------------
+
 parser = argparse.ArgumentParser(description='PyTorch SiameseX demo')
 
 parser.add_argument('--model', metavar='model', 
@@ -34,7 +50,7 @@ parser.add_argument('--model', metavar='model',
 
 args = parser.parse_args()
 
-handle = vot.VOT("rectangle")
+handle = vot.VOT("rectangle", os.path.join(root_dir, img_folder), os.path.join(root_dir, gt_file))
 selection = handle.region()
 
 # Process the first frame
@@ -46,6 +62,7 @@ if not imagefile:
 
 toc = 0
 
+frame_count = 1
 while True:
     # *****************************************
     # VOT: Call frame method to get path of the 
@@ -68,8 +85,12 @@ while True:
     #      every frame using report method.
     # *****************************************
     handle.report(region, confidence)
-    cv2.rectangle(image, (int(region.x), int(region.y)), (int(region.x + region.width), int(region.y + region.height)), (0, 255, 255), 3)
+    cv2.rectangle(image, (int(region.x), int(region.y)), (int(region.x + region.width), int(region.y + region.height)),
+                  (0, 255, 0), 2)
+    cv2.putText(image, 'Frame:%d' % frame_count, (20,20), cv2.FONT_HERSHEY_SIMPLEX,
+                0.5, [0,0,255], thickness=1)
     cv2.imshow('SiameseX', image)
+    frame_count += 1
     #cv2.waitKey(1)
     if cv2.waitKey(5) == 27:
         break
@@ -77,3 +98,4 @@ while True:
     print('Tracking Speed {:.1f}fps'.format((len(handle) - 1) / (toc / cv2.getTickFrequency())))
 
 cv2.destroyAllWindows()
+print('Tracking finished.')

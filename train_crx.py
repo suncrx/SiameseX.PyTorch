@@ -1,32 +1,33 @@
-import sys
 import os
 import time
-import json
-import random
-import math
-import numpy as np
 import argparse
-import cv2
-import h5py
 
-import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from torchvision import datasets, transforms
-import torch.nn.functional as F
+from torchvision import transforms
 from models.loss import *
-from image import load_data, generate_anchor, load_data_rpn
 from models.builder import *
-import dataset
+
 from mmcv import Config
 from utils import save_checkpoint, is_valid_number, bbox_iou
 from models.utils import load_pretrain
 from models.lr_scheduler import *
 
+import datasetsiam
+import dataset
 
+#------------------------------------------------------------------
+
+root_dir = 'D:\\GeoData\\Benchmark\\VIDEOS\\VOT2018'
+bbox_format = 1
+#------------------------------------------------------------------
+
+
+# adding default parameters
 parser = argparse.ArgumentParser(description='PyTorch SiameseX')
 
-parser.add_argument('--config', metavar='model', default='configs/SiamRPN.py', type=str,
+# model config file
+parser.add_argument('--config', metavar='model', default='configs/SiamFC.py', type=str,
                     help='which model to use.')
 
 parser.add_argument('--pre', '-p', metavar='PRETRAINED', default=None, type=str,
@@ -35,44 +36,28 @@ parser.add_argument('--pre', '-p', metavar='PRETRAINED', default=None, type=str,
 parser.add_argument('--gpu', metavar='GPU', default='0', type=str,
                     help='GPU id to use.')
 
+# training data directory
+parser.add_argument('--data_root_dir', metavar='Root directory of training data', default=root_dir,  type=str,
+                    help='GPU id to use.')
+# bounding box format
+parser.add_argument('--bbox_format', metavar='Bounding box format', default=1,  type=int,
+                    help='Bounding box format.')
+
 
 def main():
-    
+    # setting global parameters
     global args, best_prec1, weight, segmodel
-    
     best_prec1 = 0
     prec1 = 0
-    
     coco = 0
-    
-    temp_args = parser.parse_args()
 
+    # parsing parameters from commandline
+    temp_args = parser.parse_args()
     args = Config.fromfile(temp_args.config)
     args.pre = temp_args.pre
     args.gpu = temp_args.gpu
-
-    #------------------------------------------------------------
-    if os.path.isfile('./data/ilsvrc_vid.txt'):
-        with open('./data/ilsvrc_vid.txt', 'r') as outfile:
-            args.ilsvrc = json.load(outfile)
-    else:
-        args.ilsvrc = None
-
-    if os.path.isfile('./data/vot2018.txt'):
-        with open('./data/vot2018.txt', 'r') as outfile:
-            args.vot2018 = json.load(outfile)
-    else:
-        args.vot2018 = None
-
-    if os.path.isfile('youtube_final_new.txt'):
-        with open('youtube_final_new.txt', 'r') as outfile:
-            args.youtube = json.load(outfile)
-    else:
-        args.youtube = None
-    # with open('vot2018.txt', 'r') as outfile:
-    #     args.vot2018 = json.load(outfile)
-    # ------------------------------------------------------------
-
+    args.data_root_dir = temp_args.data_root_dir
+    args.bounding_box_format = temp_args.bbox_format
 
     os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
     torch.cuda.manual_seed(args.seed)
@@ -120,6 +105,7 @@ def main():
                                     momentum=args.momentum,
                                     weight_decay=args.decay)
 
+    # loading pretrained checkpoint model if it exists.
     if args.pre:
         if os.path.isfile(args.pre):
             print("=> loading checkpoint '{}'".format(args.pre))
@@ -132,8 +118,7 @@ def main():
             
             model.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.pre, checkpoint['epoch']))
+            print("=> loaded checkpoint '{}' (epoch {})".format(args.pre, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.pre))
 
@@ -153,7 +138,7 @@ def main():
         else:
             cur_lr = adjust_learning_rate(optimizer, epoch)
 
-        print('current learning rate : {}'.format(cur_lr))
+        print('Current learning rate : {}'.format(cur_lr))
 
         if args.model in ['SiamFC', 'SiamVGG', 'SiamFCRes22', 'SiamFCIncep22', 'SiamFCNext22']:
             train(model, criterion, optimizer, epoch, coco)
@@ -163,9 +148,7 @@ def main():
             trainRPNPP(model, optimizer, epoch, coco)
 
         # is_best = False
-        
         is_best = prec1 > best_prec1
-        
         best_prec1 = max(prec1, best_prec1)
 
         if epoch % 100 == 0:
@@ -183,29 +166,31 @@ def main():
             'optimizer': optimizer.state_dict(),
         }, is_best, args.model)
 
-            
+# Training models: 'SiamFC', 'SiamVGG', 'SiamFCRes22', 'SiamFCIncep22', 'SiamFCNext22'
 def train(model, criterion, optimizer, epoch, coco):
     losses = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset.listDataset(args.ilsvrc, args.youtube, args.data_type,
-                            shuffle=True,
-                            transform=transforms.Compose([
-                                                        transforms.ToTensor(),
-                                                        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                                             std=[0.229, 0.224, 0.225])]),
-                            train=True,
-                       
-                            batch_size=args.batch_size,
-                            num_workers=args.workers, coco=coco),
-        batch_size=args.batch_size)
+    # Setting image transformers
+    trans = transforms.Compose([transforms.ToTensor(),
+                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                     std=[0.229, 0.224, 0.225])])
+    # Create dataset
+    ds = datasetsiam.DatasetSiam(args.data_root_dir,
+                                 data_type='NORPN',
+                                 bounding_box_format=args.bounding_box_format,
+                                 transform=trans,
+                                 train=True,
+                                 batch_size=args.batch_size,
+                                 num_workers=args.workers)
+
+    train_loader = torch.utils.data.DataLoader(ds, batch_size=args.batch_size)
 
     model.train()
     end = time.time()
     
-    for i, (z, x, template, gt_box)in enumerate(train_loader):
+    for i, (z, x, template, gt_box) in enumerate(train_loader):
         data_time.update(time.time() - end)
         
         z = z.cuda()
@@ -247,23 +232,26 @@ def train(model, criterion, optimizer, epoch, coco):
                    data_time=data_time, loss=losses))
 
 
+# Training 'SiamRPN', 'SiamRPNVGG', 'SiamRPNRes22', 'SiamRPNIncep22', 'SiamRPNResNeXt22'
 def trainRPN(model, optimizer, epoch, coco):
     losses = AverageMeter()
     batch_time = AverageMeter()
     data_time = AverageMeter()
 
-    train_loader = torch.utils.data.DataLoader(
-        dataset.listDataset(args.ilsvrc, args.youtube, args.data_type,
-                            shuffle=True,
-                            transform=transforms.Compose([
-                                transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                                                            std=[0.229, 0.224, 0.225]),
-                            ]),
-                            train=True,
+    # Setting image transformers
+    trans = transforms.Compose([transforms.ToTensor(),
+                                transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                                     std=[0.229, 0.224, 0.225])])
+    # Create dataset
+    ds = datasetsiam.DatasetSiam(args.data_root_dir,
+                                 data_type='RPN',
+                                 bounding_box_format=args.bounding_box_format,
+                                 transform=trans,
+                                 train=True,
+                                 batch_size=args.batch_size,
+                                 num_workers=args.workers)
 
-                            batch_size=args.batch_size,
-                            num_workers=args.workers, coco=coco),
-        batch_size=args.batch_size)
+    train_loader = torch.utils.data.DataLoader(ds,  batch_size=args.batch_size)
 
     model.train()
     end = time.time()

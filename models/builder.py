@@ -235,7 +235,8 @@ class SiamRPNVGG(SiamRPN):
 
         # init weight with pretrained model
         mod = models.vgg16(pretrained=True)
-        for i in xrange(len(self.features.state_dict().items()) - 2):
+#        for i in xrange(len(self.features.state_dict().items()) - 2):
+        for i in range(len(self.features.state_dict().items()) - 2):    
             self.features.state_dict().items()[i][1].data[:] = mod.state_dict().items()[i][1].data[:]
 
 

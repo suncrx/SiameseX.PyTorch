@@ -8,7 +8,7 @@
 @date 2016
 
 """
-
+import os.path
 import sys, glob
 import copy
 import collections
@@ -91,7 +91,10 @@ def convert_region(region, to):
 
 class VOT(object):
     """ Base class for Python VOT integration """
-    def __init__(self, region_format):
+    # region_format: 'rectangle' or 'polygon'
+    # img_dir_path: the folder path that contains the frame images
+    # gt_file_path: ground-truth file path
+    def __init__(self, region_format, img_dir_path, gt_file_path):
         """ Constructor
 
         Args:
@@ -112,10 +115,27 @@ class VOT(object):
             self._trax.status(request.region)
         else:
             # self._files = [x.strip('\n') for x in open('images.txt', 'r').readlines()]
-            self._files = sorted(glob.glob('./data/bag/*.jpg'))
+            #self._files = sorted(glob.glob('./data/bag/*.jpg'))
+            self._files = sorted(glob.glob(img_dir_path+'/*.jpg'))
+            if len(self._files) == 0:
+                print('ERROR: Cannot find any images in '+img_dir_path)
+                sys.exit(0)
+
             self._frame = 0
-            self._region = convert_region(parse_region(open('./data/bag/groundtruth.txt', 'r').readline()), region_format)
+
+            #self._region = convert_region(parse_region(open('./data/bag/groundtruth.txt', 'r').readline()), region_format)
+            if not os.path.exists(gt_file_path):
+                print('ERROR: Cannot find ground-truth file: '+gt_file_path)
+                sys.exit(0)
+
+            regions = parse_region(open(gt_file_path, 'r').readline())
+            if regions is None:
+                print('ERROR: No annotated regions from ground-truth file: ' + gt_file_path)
+                sys.exit(0)
+
+            self._region = convert_region(regions, region_format)
             self._result = []
+
 
     def region(self):
         """

@@ -67,36 +67,56 @@ def generate_anchor(total_stride, scales, ratios, score_size):
     return anchor
 
 
-def load_data(pair_infos, discrim, train = True):
-
+# bounding box format 1:
+#  x1, y1, width, height
+# bounding box format 2:
+#  minx, miny, maxx, maxy
+# bounding box format 3:
+#  minx, maxx, miny, maxy
+def load_data(pair_infos, bounding_box_format=1, train = True):
+    # get the first and second image paths
     img_path1 = pair_infos[0][0]
     img_path2 = pair_infos[1][0]
 
+    # get the bounding boxes of the ground-truth
     bs1 = pair_infos[0][1]  # xmin xmax ymin ymax
     bs2 = pair_infos[1][1]
+    if bounding_box_format==1:
+        #  x1, y1, width, height
+        gt1 = Rectangle(bs1[0], bs1[1], bs1[2], bs1[3])
+        gt2 = Rectangle(bs2[0], bs2[1], bs2[2], bs2[3])
+    elif bounding_box_format==2:
+        #  minx, miny, maxx, maxy
+        gt1 = Rectangle(bs1[0], bs1[1], bs1[2]-bs1[0], bs1[3]-bs1[1])
+        gt2 = Rectangle(bs2[0], bs2[1], bs2[2]-bs2[0], bs2[3]-bs2[1])
+    else:
+        # xmin, xmax, ymin, ymax
+        gt1 = Rectangle(bs1[0], bs1[2], bs1[1]-bs1[0], bs1[3]-bs1[2])
+        gt2 = Rectangle(bs2[0], bs2[2], bs2[1]-bs2[0], bs2[3]-bs2[2])
 
-    gt1 = Rectangle(bs1[0], bs1[2], bs1[1]-bs1[0], bs1[3]-bs1[2])
-    gt2 = Rectangle(bs2[0], bs2[2], bs2[1]-bs2[0], bs2[3]-bs2[2])
-
+    # convert bounding boxes to center-based box
     gt1 = convert_bbox_format(gt1, to='center-based')
     gt2 = convert_bbox_format(gt2, to='center-based')
 
     img1 = Image.open(img_path1).convert('RGB')
     img2 = Image.open(img_path2).convert('RGB')
 
+    # get the expanding boxes of the targets
     zbox1 = get_zbox(gt1, 0.25)
     zbox2 = get_zbox(gt2, 0.25)
-    
+
+    # get a scaled box on the second image
     scales_w = 1.04 ** (random.random()*6-3)
     scales_h = 1.04 ** (random.random()*6-3)
-
     zbox2_scaled = Rectangle(zbox2.x, zbox2.y, zbox2.width*scales_w, zbox2.height*scales_h)
 
+    # we assume the second is the search region
     dx = 0
     dy = 0
-    
-    xbox2 = get_xbox(zbox2_scaled, dx, dy)  # we assume second is the search region
+    xbox2 = get_xbox(zbox2_scaled, dx, dy)
 
+    # resize img1 to size (127*127)
+    # resize img2 to size (255*255)
     z = gen_xz(img1, zbox1, to='z')
     x = gen_xz(img2, xbox2, to='x')
 
@@ -115,7 +135,7 @@ def load_data(pair_infos, discrim, train = True):
     return z, x, gt, gt_box
 
 
-def load_data_rpn(pair_infos, discrim, train=True, rpnpp=False):
+def load_data_rpn(pair_infos,  bounding_box_format=1, train=True, rpnpp=False):
     if not rpnpp:
         anchors = generate_anchor(8, [8, ], [0.33, 0.5, 1, 2, 3], 17)
         gt = np.zeros((1, 17, 17))
@@ -128,11 +148,21 @@ def load_data_rpn(pair_infos, discrim, train=True, rpnpp=False):
     img_path1 = pair_infos[0][0]
     img_path2 = pair_infos[1][0]
 
+    # get the bounding boxes of the ground-truth
     bs1 = pair_infos[0][1]  # xmin xmax ymin ymax
     bs2 = pair_infos[1][1]
-
-    gt1 = Rectangle(bs1[0], bs1[2], bs1[1] - bs1[0], bs1[3] - bs1[2])
-    gt2 = Rectangle(bs2[0], bs2[2], bs2[1] - bs2[0], bs2[3] - bs2[2])
+    if bounding_box_format == 1:
+        #  x1, y1, width, height
+        gt1 = Rectangle(bs1[0], bs1[1], bs1[2], bs1[3])
+        gt2 = Rectangle(bs2[0], bs2[1], bs2[2], bs2[3])
+    elif bounding_box_format == 2:
+        #  minx, miny, maxx, maxy
+        gt1 = Rectangle(bs1[0], bs1[1], bs1[2] - bs1[0], bs1[3] - bs1[1])
+        gt2 = Rectangle(bs2[0], bs2[1], bs2[2] - bs2[0], bs2[3] - bs2[1])
+    else:
+        # xmin, xmax, ymin, ymax
+        gt1 = Rectangle(bs1[0], bs1[2], bs1[1] - bs1[0], bs1[3] - bs1[2])
+        gt2 = Rectangle(bs2[0], bs2[2], bs2[1] - bs2[0], bs2[3] - bs2[2])
 
     gt1 = convert_bbox_format(gt1, to='center-based')
     gt2 = convert_bbox_format(gt2, to='center-based')
